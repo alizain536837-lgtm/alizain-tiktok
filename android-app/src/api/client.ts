@@ -1,8 +1,20 @@
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { AuthResult, ChatMessage, CommentItem, Conversation, CreatorStats, FeedPage, NotificationItem, SoundItem, User, VideoItem } from './types';
+
+// expo-secure-store has no web implementation — on web its methods throw and
+// the app dies before first render (blank white page). Tokens live in
+// SecureStore on iOS/Android and in AsyncStorage on web.
+const tokenStore = Platform.OS === 'web'
+  ? {
+      setItemAsync: (k: string, v: string) => AsyncStorage.setItem(k, v),
+      getItemAsync: (k: string) => AsyncStorage.getItem(k),
+      deleteItemAsync: (k: string) => AsyncStorage.removeItem(k),
+    }
+  : SecureStore;
 
 export const API_URL: string =
   (Constants.expoConfig?.extra as any)?.apiUrl || process.env.EXPO_PUBLIC_API_URL || 'https://YOUR-API-URL';
@@ -13,14 +25,14 @@ const REFRESH_KEY = 'alizain_refresh_token';
 const USER_KEY = 'alizain_user';
 
 export async function saveTokens(access: string, refresh: string) {
-  await SecureStore.setItemAsync(ACCESS_KEY, access);
-  await SecureStore.setItemAsync(REFRESH_KEY, refresh);
+  await tokenStore.setItemAsync(ACCESS_KEY, access);
+  await tokenStore.setItemAsync(REFRESH_KEY, refresh);
 }
-export async function getAccessToken() { return SecureStore.getItemAsync(ACCESS_KEY); }
-export async function getRefreshToken() { return SecureStore.getItemAsync(REFRESH_KEY); }
+export async function getAccessToken() { return tokenStore.getItemAsync(ACCESS_KEY); }
+export async function getRefreshToken() { return tokenStore.getItemAsync(REFRESH_KEY); }
 export async function clearTokens() {
-  await SecureStore.deleteItemAsync(ACCESS_KEY).catch(() => {});
-  await SecureStore.deleteItemAsync(REFRESH_KEY).catch(() => {});
+  await tokenStore.deleteItemAsync(ACCESS_KEY).catch(() => {});
+  await tokenStore.deleteItemAsync(REFRESH_KEY).catch(() => {});
   await AsyncStorage.removeItem(USER_KEY).catch(() => {});
 }
 export async function saveUser(u: User) { await AsyncStorage.setItem(USER_KEY, JSON.stringify(u)); }
@@ -59,7 +71,7 @@ class ApiClient {
           const rt = await getRefreshToken(); if (!rt) return null;
           const res = await axios.post(`${API_URL}/api/auth/refresh`, { refreshToken: rt });
           const data = res.data?.data || res.data;
-          if (data?.accessToken) { await SecureStore.setItemAsync(ACCESS_KEY, data.accessToken); if (data.refreshToken) await SecureStore.setItemAsync(REFRESH_KEY, data.refreshToken); return data.accessToken as string; }
+          if (data?.accessToken) { await tokenStore.setItemAsync(ACCESS_KEY, data.accessToken); if (data.refreshToken) await tokenStore.setItemAsync(REFRESH_KEY, data.refreshToken); return data.accessToken as string; }
           return null;
         } catch { return null; } finally { this.refreshing = null; }
       })();
