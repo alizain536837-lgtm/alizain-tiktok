@@ -1,0 +1,8 @@
+{
+  "name": "alizain-tiktok",
+  "private": true,
+  "version": "1.0.0",
+  "description": "ALIZAIN TIKTOK — short-video social platform (admin SPA + Express backend as Netlify Function)",
+  "workspaces": ["admin-website", "backend", "netlify/functions"],
+  "engines": { "node": ">=20" }
+}

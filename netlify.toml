@@ -1,0 +1,51 @@
+# ALIZAIN TIKTOK — single Netlify site.
+# Admin SPA (admin-website/dist) + backend Express app as a serverless
+# function (netlify/functions/api.ts) + PostgreSQL via Prisma (Neon).
+#
+# IMPORTANT: drag-and-drop of a ZIP does NOT deploy this site. A ZIP upload
+# performs no build and deploys no functions, so the API and the database
+# wiring would be missing. Deploy ONLY via Git import or the Netlify CLI.
+#
+# REQUIRED before the first deploy (Site settings -> Environment variables):
+#   DATABASE_URL     — PostgreSQL connection string (free Neon project)
+#   JWT_SECRET       — long random string (admin + user access tokens)
+#   JWT_REFRESH_SECRET — long random string (refresh tokens)
+# Optional (only when the owner wants them):
+#   CLOUDINARY_CLOUD_NAME / CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET
+#   LIVE_PROVIDER (none | mux | livekit), LIVE_API_KEY, LIVE_API_SECRET
+# The Super Admin account is created on first use inside the Admin Panel
+# (POST /api/admin/setup) — there is no default password anywhere.
+
+[build]
+  # NOTE (coordinator fix 2026-11-14): the backend steps MUST run with cwd
+  # inside backend/ — `npx --prefix backend prisma generate` does NOT change
+  # the working directory, so Prisma looked for schema.prisma at the repo
+  # root and failed. Installs use --workspaces=false (a plain install
+  # inside backend/ once failed with npm's "Invalid Version:" while
+  # resolving the workspace tree).
+  command = "npm --prefix backend install --workspaces=false --no-audit --no-fund && npm --prefix netlify/functions install --workspaces=false --no-audit --no-fund && cd backend && npx prisma generate && npx prisma migrate deploy && npm run seed && cd ../admin-website && npm install --workspaces=false --no-audit --no-fund && npm run build"
+  publish = "admin-website/dist"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+  NODE_OPTIONS = "--max-old-space-size=512"
+  NPM_CONFIG_AUDIT = "false"
+  NPM_CONFIG_FUND = "false"
+
+# Backend API (served by the serverless function below).
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/health"
+  to = "/.netlify/functions/api/health"
+  status = 200
+
+# SPA fallback — must stay LAST so /api/* and /health above keep working.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
