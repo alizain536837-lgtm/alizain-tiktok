@@ -33,6 +33,15 @@
   NPM_CONFIG_AUDIT = "false"
   NPM_CONFIG_FUND = "false"
 
+# Functions bundling (fix 2026-11-14): the API function imports the backend
+# Express app, which uses Prisma. The default esbuild bundler externalises
+# @prisma/client (native query engine + generated client), so the deployed
+# function crashed with "Cannot find module '@prisma/client'". The nft
+# bundler traces the function's real file dependencies and deploys them
+# with the function.
+[functions]
+  node_bundler = "nft"
+
 # Backend API (served by the serverless function below).
 [[redirects]]
   from = "/api/*"
